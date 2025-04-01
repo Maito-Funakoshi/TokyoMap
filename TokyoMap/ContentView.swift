@@ -13,7 +13,6 @@ struct ContentView: View {
     var body: some View {
        MapView(
            geoJSONFeatures: viewModel.geoJSONFeatures
-//           warningItems: viewModel.warningItems
        )
         .onAppear {
             viewModel.loadAllData()
