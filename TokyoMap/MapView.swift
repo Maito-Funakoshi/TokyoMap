@@ -16,6 +16,7 @@ struct MapView: UIViewRepresentable {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.mapType = .mutedStandard
+        mapView.showsUserLocation = true // 現在地を表示
         
         return mapView
     }
@@ -58,17 +59,31 @@ struct MapView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
-        
-        
+        private let locationManager = CLLocationManager()
 
-        
+        override init() {
+            super.init()
+            locationManager.delegate = self
+            locationManager.requestWhenInUseAuthorization() // 位置情報の使用許可をリクエスト
+            locationManager.startUpdatingLocation() // 現在地の更新を開始
+        }
+
+        func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+            guard let location = locations.last else { return }
+            print("現在地: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        }
+
+        func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+            print("位置情報の取得に失敗しました: \(error.localizedDescription)")
+        }
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             guard let polygon = overlay as? MKPolygon else {
                 return .init()
             }
 
             let renderer = MKPolygonRenderer(polygon: polygon)
-            renderer.fillColor = .green.withAlphaComponent(0.5)
+            renderer.fillColor = .green.withAlphaComponent(0.7)
             renderer.strokeColor = .gray
             renderer.lineWidth = 1
             return renderer
