@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		13567CF52D9B80B40083FB39 /* Kanna in Frameworks */ = {isa = PBXBuildFile; productRef = 13567CF42D9B80B40083FB39 /* Kanna */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		13A9186A2D9B7DEA00F80E14 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				13567CF52D9B80B40083FB39 /* Kanna in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = TokyoMap;
 			packageProductDependencies = (
+				13567CF42D9B80B40083FB39 /* Kanna */,
 			);
 			productName = TokyoMap;
 			productReference = 13A918592D9B7DE900F80E14 /* TokyoMap.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 13A918502D9B7DE900F80E14;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				13567CF02D9B80700083FB39 /* XCRemoteSwiftPackageReference "Kanna" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13A9185A2D9B7DE900F80E14 /* Products */;
 			projectDirPath = "";
@@ -558,6 +567,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		13567CF02D9B80700083FB39 /* XCRemoteSwiftPackageReference "Kanna" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tid-kijyun/Kanna";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		13567CF42D9B80B40083FB39 /* Kanna */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 13567CF02D9B80700083FB39 /* XCRemoteSwiftPackageReference "Kanna" */;
+			productName = Kanna;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 13A918512D9B7DE900F80E14 /* Project object */;
 }
