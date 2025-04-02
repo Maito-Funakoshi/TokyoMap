@@ -28,14 +28,14 @@ struct MapView: UIViewRepresentable {
     
     // 現在地へ移動するためのフラグ
     @Binding var centerOnUserLocation: Bool
-
+    
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.mapType = .mutedStandard
         mapView.showsUserLocation = true // 現在地を表示
         mapView.pointOfInterestFilter = .excludingAll
-
+        
         // 初期表示のズーム設定
         let initialCoordinate = CLLocationCoordinate2D(latitude: 35.6895, longitude: 139.6917) // 東京の座標
         let region = MKCoordinateRegion(
@@ -48,16 +48,17 @@ struct MapView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
-        uiView.removeOverlays(uiView.overlays)
-        // 非同期でオーバーレイを作成し、一括追加
-        DispatchQueue.global(qos: .userInitiated).async {
-            let overlays = geoJSONFeatures.flatMap(createOverlays(from:))
-            DispatchQueue.main.async {
-                uiView.addOverlays(overlays)
+        // GeoJSONデータが更新されたらオーバーレイを追加/更新する
+        if !geoJSONFeatures.isEmpty && uiView.overlays.isEmpty {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let overlays = self.geoJSONFeatures.flatMap(self.createOverlays(from:))
+                DispatchQueue.main.async {
+                    uiView.addOverlays(overlays)
+                }
             }
         }
-
-        // 現在地へ移動するフラグがtrueの場合、現在地にフォーカス
+        
+        // 現在地へ移動するフラグがtrueの場合のみ処理
         if centerOnUserLocation {
             if let userLocation = uiView.userLocation.location {
                 let region = MKCoordinateRegion(
@@ -72,7 +73,7 @@ struct MapView: UIViewRepresentable {
             }
         }
     }
-
+    
     private func createOverlays(from feature: MKGeoJSONFeature) -> [MKOverlay] {
         guard let metadata = extractMetadata(from: feature) else {
             return []
@@ -92,7 +93,7 @@ struct MapView: UIViewRepresentable {
             }
         }
     }
-
+    
     private func extractMetadata(from feature: MKGeoJSONFeature) -> Metadata? {
         guard let data = feature.properties else {
             return nil
@@ -100,12 +101,12 @@ struct MapView: UIViewRepresentable {
         let decoder = JSONDecoder()
         return try? decoder.decode(Metadata.self, from: data)
     }
-
+    
     func makeCoordinator() -> Coordinator {
         // ストアへの参照をコーディネーターに渡す
         Coordinator(localitiesStore: localitiesStore)
     }
-
+    
     final class Coordinator: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
         // @Stateを削除し、外部から渡されるストアを保持する
         private var localitiesStore: VisitedLocalitiesStore
@@ -113,7 +114,7 @@ struct MapView: UIViewRepresentable {
         private let locationManager = CLLocationManager()
         private let geocoder = CLGeocoder()
         private var locationUpdateTimer: Timer?
-
+        
         // 初期化時にストアを受け取る
         init(localitiesStore: VisitedLocalitiesStore) {
             self.localitiesStore = localitiesStore
@@ -122,24 +123,24 @@ struct MapView: UIViewRepresentable {
             locationManager.requestWhenInUseAuthorization()
             startLocationUpdates()
         }
-
+        
         private func startLocationUpdates() {
             locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
- // 10mの精度
+            // 10mの精度
             locationManager.distanceFilter = 5 // 5m移動するごとに更新
             locationManager.startUpdatingLocation()
         }
-
+        
         private func stopLocationUpdates() {
             locationUpdateTimer?.invalidate()
             locationUpdateTimer = nil
         }
-
+        
         func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
             guard let location = locations.last else { return }
             
             print("現在地: \(location.coordinate.latitude), \(location.coordinate.longitude)")
-
+            
             geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
                 guard let self = self else { return }
                 
@@ -147,20 +148,21 @@ struct MapView: UIViewRepresentable {
                     print("逆ジオコーディングに失敗しました: \(error.localizedDescription)")
                     return
                 }
-
+                
                 guard let placemark = placemarks?.first else {
                     print("位置情報が見つかりませんでした")
                     return
                 }
-
+                
                 if let locality = placemark.locality {
+                    
                     if !self.localitiesStore.localities.contains(locality) {
                         print("新しい自治体に訪れました: \(locality)")
                         // メインスレッドで状態を更新
                         DispatchQueue.main.async {
                             self.localitiesStore.addLocality(locality)
                         }
-                    } else {
+                    } else {  
                         print("既に訪れた自治体: \(locality)")
                     }
                 } else {
@@ -168,16 +170,16 @@ struct MapView: UIViewRepresentable {
                 }
             }
         }
-
+        
         func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
             print("位置情報の取得に失敗しました: \(error.localizedDescription)")
         }
-
+        
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             guard let polygon = overlay as? MKPolygon else {
                 return .init()
             }
-
+            
             let renderer = MKPolygonRenderer(polygon: polygon)
             renderer.fillColor = UIColor(red: 93/255, green: 167/255, blue: 79/255, alpha: 1).withAlphaComponent(0.9)
             renderer.strokeColor = .white
@@ -185,11 +187,11 @@ struct MapView: UIViewRepresentable {
             return renderer
         }
     }
-
+    
     private struct Metadata: Codable {
         let regionName: String
         let regionCode: String
-
+        
         enum CodingKeys: String, CodingKey {
             case regionName = "regionname"
             case regionCode = "regioncode"
