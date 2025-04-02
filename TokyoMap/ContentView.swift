@@ -15,7 +15,7 @@ struct ContentView: View {
     
     var body: some View {
        VStack {
-           ZStack(alignment: .topTrailing) {
+           ZStack(alignment: .bottomTrailing) {
                MapView(
                    geoJSONFeatures: viewModel.geoJSONFeatures,
                    localitiesStore: localitiesStore,
@@ -29,10 +29,11 @@ struct ContentView: View {
                Button(action: {
                    centerOnUserLocation = true
                }) {
-                   Image(systemName: "location.app")
+                   Image(systemName: "location.square.fill")
                        .resizable()
-                       .frame(width: 25, height: 25)
-                      
+                       .frame(width: 40, height: 40)
+                       .background(Color.white.opacity(1.0))
+                       .cornerRadius(8.0)
                }
                .padding()
            }
