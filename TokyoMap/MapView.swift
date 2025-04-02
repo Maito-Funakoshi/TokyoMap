@@ -12,6 +12,7 @@ import CoreLocation
 // アプリ全体で共有できる観測可能なオブジェクトを作成
 class VisitedLocalitiesStore: ObservableObject {
     @Published var localities: [String] = []
+    @Published var newLocality: String = ""
     
     func addLocality(_ locality: String) {
         if !localities.contains(locality) {
@@ -158,6 +159,7 @@ struct MapView: UIViewRepresentable {
                     
                     if !self.localitiesStore.localities.contains(locality) {
                         print("新しい自治体に訪れました: \(locality)")
+                        NotificationManager.instance.sendNotification("新たな場所に移動しました！", locality)
                         // メインスレッドで状態を更新
                         DispatchQueue.main.async {
                             self.localitiesStore.addLocality(locality)
