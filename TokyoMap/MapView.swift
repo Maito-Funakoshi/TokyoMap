@@ -9,8 +9,25 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
+// アプリ全体で共有できる観測可能なオブジェクトを作成
+class VisitedLocalitiesStore: ObservableObject {
+    @Published var localities: [String] = []
+    
+    func addLocality(_ locality: String) {
+        if !localities.contains(locality) {
+            localities.append(locality)
+        }
+    }
+}
+
 struct MapView: UIViewRepresentable {
     var geoJSONFeatures: [MKGeoJSONFeature]
+    
+    // 親ビューから渡されるObservableObjectへの参照
+    @ObservedObject var localitiesStore: VisitedLocalitiesStore
+    
+    // 現在地へ移動するためのフラグ
+    @Binding var centerOnUserLocation: Bool
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -32,7 +49,28 @@ struct MapView: UIViewRepresentable {
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
         uiView.removeOverlays(uiView.overlays)
-        uiView.addOverlays(geoJSONFeatures.flatMap(createOverlays(from:)))
+        // 非同期でオーバーレイを作成し、一括追加
+        DispatchQueue.global(qos: .userInitiated).async {
+            let overlays = geoJSONFeatures.flatMap(createOverlays(from:))
+            DispatchQueue.main.async {
+                uiView.addOverlays(overlays)
+            }
+        }
+
+        // 現在地へ移動するフラグがtrueの場合、現在地にフォーカス
+        if centerOnUserLocation {
+            if let userLocation = uiView.userLocation.location {
+                let region = MKCoordinateRegion(
+                    center: userLocation.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                )
+                uiView.setRegion(region, animated: true)
+            }
+            // フラグをリセット（一度だけ移動するため）
+            DispatchQueue.main.async {
+                self.centerOnUserLocation = false
+            }
+        }
     }
 
     private func createOverlays(from feature: MKGeoJSONFeature) -> [MKOverlay] {
@@ -64,43 +102,47 @@ struct MapView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        // ストアへの参照をコーディネーターに渡す
+        Coordinator(localitiesStore: localitiesStore)
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
-        // 訪れた自治体名を格納する配列を定義
-        @State var visitedLocalities: [String] = []
+        // @Stateを削除し、外部から渡されるストアを保持する
+        private var localitiesStore: VisitedLocalitiesStore
         
         private let locationManager = CLLocationManager()
-        private let geocoder = CLGeocoder() // 逆ジオコーディング用のインスタンスを追加
-        private var locationUpdateTimer: Timer? // 位置情報更新用のタイマーを追加
+        private let geocoder = CLGeocoder()
+        private var locationUpdateTimer: Timer?
 
-        override init() {
+        // 初期化時にストアを受け取る
+        init(localitiesStore: VisitedLocalitiesStore) {
+            self.localitiesStore = localitiesStore
             super.init()
             locationManager.delegate = self
-            locationManager.requestWhenInUseAuthorization() // 位置情報の使用許可をリクエスト
-            startLocationUpdates() // タイマーを開始
+            locationManager.requestWhenInUseAuthorization()
+            startLocationUpdates()
         }
 
         private func startLocationUpdates() {
-            // 一定時間ごとに現在地を取得するタイマーを設定
-            locationUpdateTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-                self?.locationManager.requestLocation()
-            }
+            locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+ // 10mの精度
+            locationManager.distanceFilter = 5 // 5m移動するごとに更新
+            locationManager.startUpdatingLocation()
         }
 
         private func stopLocationUpdates() {
-            // タイマーを停止
             locationUpdateTimer?.invalidate()
             locationUpdateTimer = nil
         }
 
         func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
             guard let location = locations.last else { return }
+            
             print("現在地: \(location.coordinate.latitude), \(location.coordinate.longitude)")
 
-            // 逆ジオコーディングを実行
-            geocoder.reverseGeocodeLocation(location) { placemarks, error in
+            geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
+                guard let self = self else { return }
+                
                 if let error = error {
                     print("逆ジオコーディングに失敗しました: \(error.localizedDescription)")
                     return
@@ -112,9 +154,12 @@ struct MapView: UIViewRepresentable {
                 }
 
                 if let locality = placemark.locality {
-                    if !self.visitedLocalities.contains(locality) {
+                    if !self.localitiesStore.localities.contains(locality) {
                         print("新しい自治体に訪れました: \(locality)")
-                        self.visitedLocalities.append(locality) // 新しい自治体をリストに追加
+                        // メインスレッドで状態を更新
+                        DispatchQueue.main.async {
+                            self.localitiesStore.addLocality(locality)
+                        }
                     } else {
                         print("既に訪れた自治体: \(locality)")
                     }

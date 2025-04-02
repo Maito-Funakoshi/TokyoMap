@@ -9,14 +9,42 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject var viewModel = ContentViewModel()
+    @StateObject private var localitiesStore = VisitedLocalitiesStore()
+    // 現在地へ移動するためのフラグ
+    @State private var centerOnUserLocation = false
     
     var body: some View {
-       MapView(
-           geoJSONFeatures: viewModel.geoJSONFeatures
-       )
-        .onAppear {
-            viewModel.loadAllData()
-        }
+       VStack {
+           ZStack(alignment: .topTrailing) {
+               MapView(
+                   geoJSONFeatures: viewModel.geoJSONFeatures,
+                   localitiesStore: localitiesStore,
+                   centerOnUserLocation: $centerOnUserLocation
+               )
+               .onAppear {
+                   viewModel.loadAllData()
+               }
+
+               // 現在地ボタン
+               Button(action: {
+                   centerOnUserLocation = true
+               }) {
+                   Image(systemName: "location.app")
+                       .resizable()
+                       .frame(width: 25, height: 25)
+                      
+               }
+               .padding()
+           }
+            
+            // 訪問した自治体のリストを表示する例
+            List {
+                ForEach(localitiesStore.localities, id: \.self) { locality in
+                    Text(locality)
+                }
+            }
+            .frame(height: 200)
+       }
     }
 }
 
