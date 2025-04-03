@@ -14,6 +14,7 @@ class MapViewObservable: ObservableObject {
     @Published var localities: [String] = []
     @Published var newLocality: String = ""
     @Published var totalDistance: Double = 0.0 // 移動距離を記録する変数を追加
+    @Published var trajectory: [CLLocationCoordinate2D] = []
     
     func addLocality(_ locality: String) {
         if !localities.contains(locality) {
@@ -51,7 +52,7 @@ struct MapView: UIViewRepresentable {
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
         // GeoJSONデータが更新されたらオーバーレイを追加/更新する
-        if !geoJSONFeatures.isEmpty && uiView.overlays.isEmpty {
+        if !geoJSONFeatures.isEmpty && uiView.overlays.filter({ $0 is MKPolygon || $0 is MKMultiPolygon }).isEmpty {
             DispatchQueue.global(qos: .userInitiated).async {
                 let overlays = self.geoJSONFeatures.flatMap(self.createOverlays(from:))
                 DispatchQueue.main.async {
@@ -60,12 +61,22 @@ struct MapView: UIViewRepresentable {
             }
         }
         
+        // 軌跡の描画処理
+        // 既存の軌跡のポリラインを削除
+        uiView.overlays.filter { $0 is MKPolyline }.forEach { uiView.removeOverlay($0) }
+        
+        // 新しい軌跡のポリラインを追加（2点以上ある場合のみ）
+        if mapViewStore.trajectory.count >= 2 {
+            let polyline = MKPolyline(coordinates: mapViewStore.trajectory, count: mapViewStore.trajectory.count)
+            uiView.addOverlay(polyline)
+        }
+        
         // 現在地へ移動するフラグがtrueの場合のみ処理
         if centerOnUserLocation {
             if let userLocation = uiView.userLocation.location {
                 let region = MKCoordinateRegion(
                     center: userLocation.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                    span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
                 )
                 uiView.setRegion(region, animated: true)
             }
@@ -143,6 +154,8 @@ struct MapView: UIViewRepresentable {
             guard let location = locations.last else { return }
             
             print("現在地: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+            self.mapViewStore.trajectory.append(location.coordinate)
+            
             
             // 移動距離を計算して更新
             if let lastLocation = lastLocation {
@@ -189,15 +202,22 @@ struct MapView: UIViewRepresentable {
         }
         
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            guard let polygon = overlay as? MKPolygon else {
-                return .init()
+            if let polygon = overlay as? MKPolygon {
+                let renderer = MKPolygonRenderer(polygon: polygon)
+                renderer.fillColor = UIColor(red: 93/255, green: 167/255, blue: 79/255, alpha: 1).withAlphaComponent(0.9)
+                renderer.strokeColor = .white
+                renderer.lineWidth = 1
+                return renderer
+            } else if let polyline = overlay as? MKPolyline {
+                // 軌跡の描画設定
+                let renderer = MKPolylineRenderer(polyline: polyline)
+                renderer.strokeColor = UIColor.blue
+                renderer.lineWidth = 4.0
+                renderer.alpha = 0.7
+                return renderer
             }
             
-            let renderer = MKPolygonRenderer(polygon: polygon)
-            renderer.fillColor = UIColor(red: 93/255, green: 167/255, blue: 79/255, alpha: 1).withAlphaComponent(0.9)
-            renderer.strokeColor = .white
-            renderer.lineWidth = 1
-            return renderer
+            return .init()
         }
     }
     

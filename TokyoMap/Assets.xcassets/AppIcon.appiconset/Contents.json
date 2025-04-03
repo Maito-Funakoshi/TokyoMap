@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "スクリーンショット 2025-04-03 15.35.26.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -12,6 +13,7 @@
           "value" : "dark"
         }
       ],
+      "filename" : "スクリーンショット 2025-04-03 15.35.26 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -23,6 +25,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "スクリーンショット 2025-04-03 15.35.26 2.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
