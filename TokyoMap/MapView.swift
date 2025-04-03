@@ -10,9 +10,10 @@ import MapKit
 import CoreLocation
 
 // アプリ全体で共有できる観測可能なオブジェクトを作成
-class VisitedLocalitiesStore: ObservableObject {
+class MapViewObservable: ObservableObject {
     @Published var localities: [String] = []
     @Published var newLocality: String = ""
+    @Published var totalDistance: Double = 0.0 // 移動距離を記録する変数を追加
     
     func addLocality(_ locality: String) {
         if !localities.contains(locality) {
@@ -25,7 +26,7 @@ struct MapView: UIViewRepresentable {
     var geoJSONFeatures: [MKGeoJSONFeature]
     
     // 親ビューから渡されるObservableObjectへの参照
-    @ObservedObject var localitiesStore: VisitedLocalitiesStore
+    @ObservedObject var mapViewStore: MapViewObservable
     
     // 現在地へ移動するためのフラグ
     @Binding var centerOnUserLocation: Bool
@@ -105,20 +106,21 @@ struct MapView: UIViewRepresentable {
     
     func makeCoordinator() -> Coordinator {
         // ストアへの参照をコーディネーターに渡す
-        Coordinator(localitiesStore: localitiesStore)
+        Coordinator(mapViewStore: mapViewStore)
     }
     
     final class Coordinator: NSObject, MKMapViewDelegate, CLLocationManagerDelegate {
         // @Stateを削除し、外部から渡されるストアを保持する
-        private var localitiesStore: VisitedLocalitiesStore
+        private var mapViewStore: MapViewObservable
+        private var lastLocation: CLLocation? // 前回の位置情報を記録する変数を追加
         
         private let locationManager = CLLocationManager()
         private let geocoder = CLGeocoder()
         private var locationUpdateTimer: Timer?
         
         // 初期化時にストアを受け取る
-        init(localitiesStore: VisitedLocalitiesStore) {
-            self.localitiesStore = localitiesStore
+        init(mapViewStore: MapViewObservable) {
+            self.mapViewStore = mapViewStore
             super.init()
             locationManager.delegate = self
             locationManager.requestWhenInUseAuthorization()
@@ -142,6 +144,15 @@ struct MapView: UIViewRepresentable {
             
             print("現在地: \(location.coordinate.latitude), \(location.coordinate.longitude)")
             
+            // 移動距離を計算して更新
+            if let lastLocation = lastLocation {
+                let distance = location.distance(from: lastLocation)
+                DispatchQueue.main.async {
+                    self.mapViewStore.totalDistance += distance
+                }
+            }
+            self.lastLocation = location // 現在の位置を記録
+            
             geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
                 guard let self = self else { return }
                 
@@ -157,14 +168,14 @@ struct MapView: UIViewRepresentable {
                 
                 if let locality = placemark.locality {
                     
-                    if !self.localitiesStore.localities.contains(locality) {
+                    if !self.mapViewStore.localities.contains(locality) {
                         print("新しい自治体に訪れました: \(locality)")
                         NotificationManager.instance.sendNotification("新たな場所に移動しました！", locality)
                         // メインスレッドで状態を更新
                         DispatchQueue.main.async {
-                            self.localitiesStore.addLocality(locality)
+                            self.mapViewStore.addLocality(locality)
                         }
-                    } else {  
+                    } else {
                         print("既に訪れた自治体: \(locality)")
                     }
                 } else {
