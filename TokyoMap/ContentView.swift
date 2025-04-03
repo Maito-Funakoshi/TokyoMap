@@ -21,7 +21,8 @@ struct ContentView: View {
         VStack {
             ZStack(alignment: .topLeading) {
                 MapView(
-                    geoJSONFeatures: viewModel.geoJSONFeatures,
+                    municipalitiesGeoJSONFeatures: viewModel.municipalitiesFeatures,
+                    // prefecturesGeoJSONFeatures: viewModel.prefecturesFeatures,
                     mapViewStore: mapViewStore,
                     centerOnUserLocation: $centerOnUserLocation
                 )

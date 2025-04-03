@@ -9,12 +9,15 @@ import Foundation
 import MapKit
 
 final class ContentViewModel: ObservableObject {
-    @Published var geoJSONFeatures: [MKGeoJSONFeature] = []
+    @Published var municipalitiesFeatures: [MKGeoJSONFeature] = []
+    // @Published var prefecturesFeatures: [MKGeoJSONFeature] = []
     
     func loadAllData() {
        do {
-           let geoJSONFeatures = try loadGeoJSON(from: "japan")
-           self.geoJSONFeatures = geoJSONFeatures
+           let municipalitiesFeatures = try loadGeoJSON(from: "municipalities")
+           // let prefecturesFeatures = try loadGeoJSON(from: "prefectures")
+           self.municipalitiesFeatures = municipalitiesFeatures
+           // self.prefecturesFeatures = prefecturesFeatures
        } catch {
            assertionFailure("GeoJSONのデコードに失敗しました: \(error)")
        }
