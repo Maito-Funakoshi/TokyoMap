@@ -24,8 +24,7 @@ class MapViewObservable: ObservableObject {
 }
 
 struct MapView: UIViewRepresentable {
-    var municipalitiesGeoJSONFeatures: [MKGeoJSONFeature]
-    // var prefecturesGeoJSONFeatures: [MKGeoJSONFeature]
+    var geoJSONFeatures: [MKGeoJSONFeature]
     
     // 親ビューから渡されるObservableObjectへの参照
     @ObservedObject var mapViewStore: MapViewObservable
@@ -53,23 +52,14 @@ struct MapView: UIViewRepresentable {
     
     func updateUIView(_ uiView: MKMapView, context: Context) {
         // GeoJSONデータが更新されたらオーバーレイを追加/更新する
-        if !municipalitiesGeoJSONFeatures.isEmpty {
+        if !geoJSONFeatures.isEmpty && uiView.overlays.filter({ $0 is MKPolygon || $0 is MKMultiPolygon }).isEmpty {
             DispatchQueue.global(qos: .userInitiated).async {
-                let overlays = self.municipalitiesGeoJSONFeatures.flatMap(self.createOverlays(from:))
+                let overlays = self.geoJSONFeatures.flatMap(self.createOverlays(from:))
                 DispatchQueue.main.async {
                     uiView.addOverlays(overlays)
                 }
             }
         }
-        // // 都道府県用オーバーレイの追加（まだ追加されていない場合）
-        // if !prefecturesGeoJSONFeatures.isEmpty {
-        //     DispatchQueue.global(qos: .userInitiated).async {
-        //         let overlays = self.prefecturesGeoJSONFeatures.flatMap(self.createOverlays(from:))
-        //         DispatchQueue.main.async {
-        //             uiView.addOverlays(overlays)
-        //         }
-        //     }
-        // }
         
         // 軌跡の描画処理
         // 既存の軌跡のポリラインを削除
@@ -98,61 +88,32 @@ struct MapView: UIViewRepresentable {
     }
     
     private func createOverlays(from feature: MKGeoJSONFeature) -> [MKOverlay] {
-        // まず市区町村メタデータの取得を試みる
-        guard let municipalitiesMetadata = extractMunicipalitiesMetadata(from: feature) else {
+        guard let metadata = extractMetadata(from: feature) else {
             return []
         }
         return feature.geometry.flatMap { geometry in
             switch geometry {
             case let polygon as MKPolygon:
-                polygon.title = municipalitiesMetadata.regionName
-                polygon.subtitle = municipalitiesMetadata.regionCode
+                polygon.title = metadata.regionName
+                polygon.subtitle = metadata.regionCode
                 return [polygon]
             case let multiPolygon as MKMultiPolygon:
-                multiPolygon.title = municipalitiesMetadata.regionName
-                multiPolygon.subtitle = municipalitiesMetadata.regionCode
+                multiPolygon.title = metadata.regionName
+                multiPolygon.subtitle = metadata.regionCode
                 return multiPolygon.polygons
             default:
                 return []
             }
         }
-    } 
-        // // 次に都道府県メタデータの取得を試みる
-        // else if let prefecturesMetadata = extractPrefecturesMetadata(from: feature) {
-        //     let overlays = feature.geometry.flatMap { geometry in
-        //         switch geometry {
-        //         case let polygon as MKPolygon:
-        //             polygon.title = prefecturesMetadata.name
-        //             polygon.subtitle = prefecturesMetadata.pref
-        //             return [polygon]
-        //         case let multiPolygon as MKMultiPolygon:
-        //             multiPolygon.title = prefecturesMetadata.name
-        //             multiPolygon.subtitle = prefecturesMetadata.pref
-        //             return multiPolygon.polygons
-        //         default:
-        //             return []
-        //         }
-        //     }
-        //     return overlays
-        // }
-        // どちらのメタデータも取得できなかった場合
-    private func extractMunicipalitiesMetadata(from feature: MKGeoJSONFeature) -> municipalitiesMetadata? {
+    }
+    
+    private func extractMetadata(from feature: MKGeoJSONFeature) -> Metadata? {
         guard let data = feature.properties else {
             return nil
         }
         let decoder = JSONDecoder()
-        return try? decoder.decode(municipalitiesMetadata.self, from: data)
+        return try? decoder.decode(Metadata.self, from: data)
     }
-    
-    // private func extractPrefecturesMetadata(from feature: MKGeoJSONFeature) -> prefecturesMetadata? {
-    //     guard let data = feature.properties else {
-    //         print("プロパティがnilです: \(feature)")
-    //         return nil
-    //     }
-        
-    //     let decoder = JSONDecoder()
-    //     return try? decoder.decode(prefecturesMetadata.self, from: data)
-    // }
     
     func makeCoordinator() -> Coordinator {
         // ストアへの参照をコーディネーターに渡す
@@ -164,19 +125,13 @@ struct MapView: UIViewRepresentable {
         private var mapViewStore: MapViewObservable
         private var lastLocation: CLLocation? // 前回の位置情報を記録する変数を追加
         
-        // // GeoJSONデータを保持するプロパティを追加
-        // private var municipalitiesGeoJSONFeatures: [MKGeoJSONFeature]
-        // private var prefecturesGeoJSONFeatures: [MKGeoJSONFeature]
-        
         private let locationManager = CLLocationManager()
         private let geocoder = CLGeocoder()
         private var locationUpdateTimer: Timer?
         
-        // 初期化時にストアとGeoJSONデータを受け取る
+        // 初期化時にストアを受け取る
         init(mapViewStore: MapViewObservable) {
             self.mapViewStore = mapViewStore
-            // self.municipalitiesGeoJSONFeatures = municipalitiesFeatures
-            // self.prefecturesGeoJSONFeatures = prefecturesFeatures
             super.init()
             locationManager.delegate = self
             locationManager.requestWhenInUseAuthorization()
@@ -266,7 +221,7 @@ struct MapView: UIViewRepresentable {
         }
     }
     
-    private struct municipalitiesMetadata: Codable {
+    private struct Metadata: Codable {
         let regionName: String
         let regionCode: String
         
@@ -275,9 +230,4 @@ struct MapView: UIViewRepresentable {
             case regionCode = "regioncode"
         }
     }
-    
-    // private struct prefecturesMetadata: Codable {
-    //     let pref: String
-    //     let name: String
-    // }
 }
